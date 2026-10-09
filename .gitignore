@@ -23,3 +23,5 @@ node_modules/
 /~/
 graphify-out/
 composeApp/release/
+build.log
+build.done

@@ -1,20 +1,30 @@
 import java.util.Base64
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidApplication) apply false
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
 }
 
+// -PdesktopOnly=true skips the Android plugin and target, so the desktop app builds on a
+// host without an Android SDK (plain JDK 17+ is enough).
+val desktopOnly = providers.gradleProperty("desktopOnly").orNull == "true"
+if (!desktopOnly) apply(plugin = libs.plugins.androidApplication.get().pluginId)
+
 kotlin {
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+    if (!desktopOnly) {
+        androidTarget {
+            compilerOptions {
+                jvmTarget.set(JvmTarget.JVM_11)
+            }
         }
     }
+
+    jvm("desktop")
 
     listOf(
         iosArm64(),
@@ -57,12 +67,21 @@ kotlin {
             implementation(libs.kmqtt.common)
             implementation(libs.okio)
         }
-        androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.ktor.client.okhttp)
-            // Pre-built libwebrtc for the camera live view (shared/webrtc actuals)
-            implementation(libs.stream.webrtc.android)
+        if (!desktopOnly) {
+            androidMain.dependencies {
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.ktor.client.okhttp)
+                // Pre-built libwebrtc for the camera live view (shared/webrtc actuals)
+                implementation(libs.stream.webrtc.android)
+            }
+        }
+        val desktopMain by getting {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+                implementation(libs.ktor.client.okhttp)
+                implementation(libs.kotlinx.coroutines.swing)
+            }
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -80,7 +99,20 @@ compose.resources {
     packageOfResClass = "com.kodraliu.localrock.resources"
 }
 
-android {
+compose.desktop {
+    application {
+        mainClass = "com.kodraliu.localrock.MainKt"
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Deb)
+            packageName = "LocalRock"
+            packageVersion = "1.2.0"
+            description = "Local-network client for Roborock vacuums"
+            macOS { bundleID = "com.kodraliu.localrock.desktop" }
+        }
+    }
+}
+
+if (!desktopOnly) extensions.configure<com.android.build.api.dsl.ApplicationExtension>("android") {
     namespace = "com.kodraliu.localrock"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -157,6 +189,8 @@ kotlin.sourceSets.commonTest.configure {
     kotlin.srcDir(generateTestFixtures)
 }
 
-dependencies {
-    debugImplementation(libs.compose.uiTooling)
+if (!desktopOnly) {
+    dependencies {
+        "debugImplementation"(libs.compose.uiTooling)
+    }
 }
