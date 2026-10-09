@@ -25,3 +25,4 @@ graphify-out/
 composeApp/release/
 build.log
 build.done
+dist/

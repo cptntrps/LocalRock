@@ -198,6 +198,8 @@ class VacuumSession(
                     }
                 }
                 println("[VacLocal] rpc response id=${resp.id} result=${resp.result} error=${resp.error}")
+            }.onFailure { e ->
+                println("[VacLocal] response decode FAILED (${m.payload.size} bytes): ${e::class.simpleName}: ${e.message?.take(300)}")
             }
             val dps = V1Envelope.decodeDpsPush(m.payload)
             if (dps != null) {
